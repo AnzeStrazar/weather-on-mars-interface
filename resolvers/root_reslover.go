@@ -12,12 +12,18 @@ func NewRootResolver(cache *cache.Cache) *RootResolver {
 	return &RootResolver{cache: cache}
 }
 
-func (r *RootResolver) Sol(args struct{ ID *string }) *SolResolver {
+func (r *RootResolver) Sol(args struct{ ID *string }) *[]*SolResolver {
+	resolversResults := make([]*SolResolver, 0)
+
 	if args.ID == nil {
-		solResult := r.cache.SolCache["583"]
-		return &SolResolver{&solResult}
+		for _, solResult := range r.cache.SolCache {
+			resolversResults = append(resolversResults, &SolResolver{&solResult})
+		}
+
+		return &resolversResults
 	}
 	solResult := r.cache.SolCache[*args.ID]
 
-	return &SolResolver{&solResult}
+	resolversResults = append(resolversResults, &SolResolver{&solResult})
+	return &resolversResults
 }
