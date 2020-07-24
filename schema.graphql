@@ -34,31 +34,6 @@ type Sol {
 }
 
 type Query {
-  sol(id: String): Sol 
+  sols: [Sol] 
+  sol(id: String!): Sol 
 }
-
-# {
-#   sol {
-#     at {
-#         av
-#         ct
-#         mn
-#         mx
-#     }
-#     first_utc
-#     hws {
-#         av
-#         ct
-#         mn
-#         mx
-#     }
-#     last_utc
-#     pre {
-#         av
-#         ct
-#         mn
-#         mx
-#     }
-#     season
-#   }
-# }
