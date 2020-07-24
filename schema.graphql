@@ -2,7 +2,63 @@ schema {
   query: Query
 }
 
-type Query {
-  info: String!
+# type Query {
+#   info: String!
+# }
+
+type AT {
+   av: Float
+   ct: Float
+   mn: Float
+   mx: Float
 }
 
+type HWS {
+   av: Float
+   ct: Float
+   mn: Float
+   mx: Float
+}
+
+type PRE {
+   av: Float
+   ct: Float
+   mn: Float
+   mx: Float
+}
+
+type Sol {
+    At: AT
+    # hws: HWS
+    # pre: PRE
+}
+
+type Query {
+  sol(id: String): Sol 
+}
+
+# {
+#   sol {
+#     at {
+#         av
+#         ct
+#         mn
+#         mx
+#     }
+#     first_utc
+#     hws {
+#         av
+#         ct
+#         mn
+#         mx
+#     }
+#     last_utc
+#     pre {
+#         av
+#         ct
+#         mn
+#         mx
+#     }
+#     season
+#   }
+# }

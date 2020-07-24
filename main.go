@@ -8,36 +8,15 @@ import (
 	"net/http"
 	"time"
 	"weather-on-mars-interface/cache"
+	"weather-on-mars-interface/resolvers"
+	"weather-on-mars-interface/types"
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 )
 
-type RootResolver struct {
-	redisClient *cache.Redis
-}
-
 type NasaData struct {
-	redisClient *cache.Redis
-	Sols        []Sol
-}
-
-type Sol struct {
-	SolId string
-	Data  struct {
-		At AT `json:"AT"`
-	}
-}
-
-type AT struct {
-	Av float64 `json:"av"`
-	Ct float64 `json:"ct"`
-	Mn float64 `json:"mn"`
-	Mx float64 `json:"mx"`
-}
-
-func (r *RootResolver) Info() (string, error) {
-	return string(r.redisClient.Get("584")), nil
+	cache *cache.Cache
 }
 
 // Reads and parses the schema from file.
@@ -58,12 +37,6 @@ func parseSchema(path string, resolver interface{}) *graphql.Schema {
 	return parsedSchema
 }
 
-func newNasaData(rds *cache.Redis) NasaData {
-	return NasaData{
-		redisClient: rds,
-	}
-}
-
 func (nd *NasaData) runUpdater() {
 	for {
 		nd.update()
@@ -82,36 +55,62 @@ func (nd *NasaData) update() {
 	serializedData := make(map[string]interface{})
 	json.NewDecoder(response.Body).Decode(&serializedData)
 	solKeys := serializedData["sol_keys"].([]interface{})
-	newSols := make([]Sol, 0)
+	newSols := make([]types.Sol, 0)
 	for _, solId := range solKeys {
-		sol := Sol{
+		sol := types.Sol{
 			SolId: solId.(string),
 			Data: struct {
-				At AT `json:"AT"`
+				At  types.AT  `json:"AT"`
+				Hws types.HWS `json:"HWS"`
+				Pre types.PRE `json:"PRE"`
 			}{},
 		}
 		solData := serializedData[solId.(string)]
-		atmosfericTemperature := solData.(map[string]interface{})["AT"].(map[string]interface{})
-		sol.Data.At.Av = atmosfericTemperature["av"].(float64)
-		sol.Data.At.Ct = atmosfericTemperature["ct"].(float64)
-		sol.Data.At.Mn = atmosfericTemperature["mn"].(float64)
-		sol.Data.At.Mx = atmosfericTemperature["mx"].(float64)
+		atmosphericTemperature := solData.(map[string]interface{})["AT"].(map[string]interface{})
+		sol.Data.At.Av = atmosphericTemperature["av"].(float64)
+		sol.Data.At.Ct = atmosphericTemperature["ct"].(float64)
+		sol.Data.At.Mn = atmosphericTemperature["mn"].(float64)
+		sol.Data.At.Mx = atmosphericTemperature["mx"].(float64)
+
+		horizontalWindSpeed := solData.(map[string]interface{})["HWS"].(map[string]interface{})
+		sol.Data.Hws.Av = horizontalWindSpeed["av"].(float64)
+		sol.Data.Hws.Ct = horizontalWindSpeed["ct"].(float64)
+		sol.Data.Hws.Mn = horizontalWindSpeed["mn"].(float64)
+		sol.Data.Hws.Mx = horizontalWindSpeed["mx"].(float64)
+
+		atmosphericPressure := solData.(map[string]interface{})["PRE"].(map[string]interface{})
+		sol.Data.Pre.Av = atmosphericPressure["av"].(float64)
+		sol.Data.Pre.Ct = atmosphericPressure["ct"].(float64)
+		sol.Data.Pre.Mn = atmosphericPressure["mn"].(float64)
+		sol.Data.Pre.Mx = atmosphericPressure["mx"].(float64)
+
 		newSols = append(newSols, sol)
 	}
-	nd.Sols = newSols
-	nd.saveToRedis()
+	fmt.Printf("%v", newSols)
+	nd.saveToCache(newSols)
 
 	// Save to mongoDB
+	// nd.saveToMongo()
 }
 
 func (nd *NasaData) saveToMongo() {
 	// Save data to mongo
+	/*
+		for solId, data := range nd.Sols {
+			//save (solId, data )
+			// Data to JSON and SAVE the data to mongoDB
+			nd.mongoDBClient.Set(data.SolId, "smth 	"+data.SolId)
+			log.Println(nd.mongoDBClient.Get(data.SolId))
+
+		}
+	*/
 }
 
-func (nd *NasaData) saveToRedis() {
-	for _, data := range nd.Sols {
-		nd.redisClient.Set(data.SolId, "smth 	"+data.SolId)
-		log.Println(nd.redisClient.Get(data.SolId))
+func (nd *NasaData) saveToCache(newSols []types.Sol) {
+	nd.cache.SolMutex.Lock()
+	defer nd.cache.SolMutex.Unlock()
+	for _, solData := range newSols {
+		nd.cache.SolCache[solData.SolId] = solData
 	}
 }
 
@@ -124,13 +123,13 @@ func (nd *NasaData) get(solId string) {
 }
 
 func main() {
-	rds := cache.NewRedis("redis://:redispassword@127.0.0.1:48000")
-	nasaData := newNasaData(rds)
 	// We re going to start our periodic data updater here.
+	cache := cache.Cache{SolCache: make(map[string]types.Sol)}
+	nasaData := NasaData{&cache}
 	go nasaData.runUpdater()
 
 	http.Handle("/graphql", &relay.Handler{
-		Schema: parseSchema("./schema.graphql", &RootResolver{redisClient: rds}),
+		Schema: parseSchema("./schema.graphql", resolvers.NewRootResolver(&cache)),
 	})
 
 	fmt.Println("serving on 8080")

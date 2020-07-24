@@ -1,0 +1,11 @@
+{
+    "httpport": "8080",
+    "redis": "redis://:redispassword@localhost:48000",
+    "db": {
+        "host": "localhost",
+        "port": "48000",
+        "user": "earth",
+        "password": "earth",
+        "database": "mongodb"
+    }
+}
