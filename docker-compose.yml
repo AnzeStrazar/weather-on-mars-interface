@@ -1,13 +1,8 @@
 version: "3"
-#services:
-# db:
-#   image: mongodb
-#   restart: always
-#   environment:
-#     MONGODB_DATABASE: "weather-on-mars"
-#     MONGODB_USER: "earth"
-#     MONGODB_PASSWORD: "earth"
-#     MONGODB_ENCODING: "UNICODE"
-#   ports:
-#     - "48000:5432"
 
+services:
+  db:
+    image: mongo
+    restart: always
+    ports:
+      - "48000:27017"
