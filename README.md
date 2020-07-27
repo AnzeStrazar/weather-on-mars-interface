@@ -16,3 +16,4 @@ This API is still work in progress. We need to add a few additional requirements
 - pagination
 - GraphQL Subscription
 - Unit tests
+- Code refactoring
