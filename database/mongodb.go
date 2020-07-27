@@ -1,52 +1,32 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
-	// "go.mongodb.org/mongo-driver/bson"
-	// "go.mongodb.org/mongo-driver/mongo"
-	// "go.mongodb.org/mongo-driver/mongo/options"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoDB struct {
-	Db *sql.DB
-}
+func NewMongoDB(dbhost, dbport string) *mongo.Client {
 
-func NewMongoDB(dbhost, dbport, dbuser, dbpass, dbname string) MongoDB {
-	mongodb := MongoDB{}
+	// Set client options
+	clientOptions := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s", dbhost, dbport))
 
-	mgoInfo := fmt.Sprintf("host=%s port=%s user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		dbhost, dbport,
-		dbuser, dbpass, dbname)
-	log.Println(mgoInfo)
-
-	db, err := sql.Open("mongodb", mgoInfo)
+	// Connect to MongoDB
+	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		panic(err)
+		log.Print(err)
 	}
 
-	err = db.Ping()
+	// Check the connection
+	err = client.Ping(context.TODO(), nil)
 	if err != nil {
-		panic(err)
+		log.Print(err)
 	}
 
-	log.Println("Database connection established!")
+	fmt.Println("Connected to MongoDB!")
 
-	mongodb.Db = db
-
-	return mongodb
+	return client
 }
-
-/*
-// Returns string representation of the key stored in mongoDB.
-func (m *MongoDB) Get(key string) string {
-	return m.Db.Get(key).Val()
-}
-
-// Sets the key to the mongoDB.
-func (m *MongoDB) Set(key string, value interface{}) {
-	m.Db.Set(key, value, 0)
-}
-*/
