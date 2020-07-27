@@ -2,10 +2,6 @@ schema {
   query: Query
 }
 
-# type Query {
-#   info: String!
-# }
-
 type AT {
    av: Float
    ct: Float
@@ -28,9 +24,10 @@ type PRE {
 }
 
 type Sol {
+    SolID: String!
     At: AT
-    # hws: HWS
-    # pre: PRE
+    Hws: HWS
+    Pre: PRE
 }
 
 type Query {
