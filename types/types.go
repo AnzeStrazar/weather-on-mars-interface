@@ -1,31 +1,29 @@
 package types
 
 type Sol struct {
-	SolId string
-	Data  struct {
-		At  AT  `json:"AT"`
-		Hws HWS `json:"HWS"`
-		Pre PRE `json:"PRE"`
-	}
+	SolId string `json:"solID" bson:"solID"`
+	At    AT     `json:"AT" bson:"AT"`
+	Hws   HWS    `json:"HWS" bson:"HWS"`
+	Pre   PRE    `json:"PRE" bson:"PRE"`
 }
 
 type AT struct {
-	Av float64 `json:"av"`
-	Ct float64 `json:"ct"`
-	Mn float64 `json:"mn"`
-	Mx float64 `json:"mx"`
+	Av float64 `json:"av" bson:"av"`
+	Ct float64 `json:"ct" bson:"ct"`
+	Mn float64 `json:"mn" bson:"mn"`
+	Mx float64 `json:"mx" bson:"mx"`
 }
 
 type HWS struct {
-	Av float64 `json:"av"`
-	Ct float64 `json:"ct"`
-	Mn float64 `json:"mn"`
-	Mx float64 `json:"mx"`
+	Av float64 `json:"av" bson:"av"`
+	Ct float64 `json:"ct" bson:"ct"`
+	Mn float64 `json:"mn" bson:"mn"`
+	Mx float64 `json:"mx" bson:"mx"`
 }
 
 type PRE struct {
-	Av float64 `json:"av"`
-	Ct float64 `json:"ct"`
-	Mn float64 `json:"mn"`
-	Mx float64 `json:"mx"`
+	Av float64 `json:"av" bson:"av"`
+	Ct float64 `json:"ct" bson:"ct"`
+	Mn float64 `json:"mn" bson:"mn"`
+	Mx float64 `json:"mx" bson:"mx"`
 }
