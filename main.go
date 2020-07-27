@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,19 +9,23 @@ import (
 	"net/http"
 	"time"
 	"weather-on-mars-interface/cache"
+	"weather-on-mars-interface/database"
 	"weather-on-mars-interface/resolvers"
 	"weather-on-mars-interface/types"
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type NasaData struct {
-	cache *cache.Cache
+	cache  *cache.Cache
+	client *mongo.Client
 }
 
 // Reads and parses the schema from file.
-// Associates root resolver. Panics if can't read.
 func parseSchema(path string, resolver interface{}) *graphql.Schema {
 	bstr, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -37,6 +42,7 @@ func parseSchema(path string, resolver interface{}) *graphql.Schema {
 	return parsedSchema
 }
 
+// TODO: Add Subscription instead of sleep delay.
 func (nd *NasaData) runUpdater() {
 	for {
 		nd.update()
@@ -59,51 +65,44 @@ func (nd *NasaData) update() {
 	for _, solId := range solKeys {
 		sol := types.Sol{
 			SolId: solId.(string),
-			Data: struct {
-				At  types.AT  `json:"AT"`
-				Hws types.HWS `json:"HWS"`
-				Pre types.PRE `json:"PRE"`
-			}{},
 		}
 		solData := serializedData[solId.(string)]
 		atmosphericTemperature := solData.(map[string]interface{})["AT"].(map[string]interface{})
-		sol.Data.At.Av = atmosphericTemperature["av"].(float64)
-		sol.Data.At.Ct = atmosphericTemperature["ct"].(float64)
-		sol.Data.At.Mn = atmosphericTemperature["mn"].(float64)
-		sol.Data.At.Mx = atmosphericTemperature["mx"].(float64)
+		sol.At.Av = atmosphericTemperature["av"].(float64)
+		sol.At.Ct = atmosphericTemperature["ct"].(float64)
+		sol.At.Mn = atmosphericTemperature["mn"].(float64)
+		sol.At.Mx = atmosphericTemperature["mx"].(float64)
 
 		horizontalWindSpeed := solData.(map[string]interface{})["HWS"].(map[string]interface{})
-		sol.Data.Hws.Av = horizontalWindSpeed["av"].(float64)
-		sol.Data.Hws.Ct = horizontalWindSpeed["ct"].(float64)
-		sol.Data.Hws.Mn = horizontalWindSpeed["mn"].(float64)
-		sol.Data.Hws.Mx = horizontalWindSpeed["mx"].(float64)
+		sol.Hws.Av = horizontalWindSpeed["av"].(float64)
+		sol.Hws.Ct = horizontalWindSpeed["ct"].(float64)
+		sol.Hws.Mn = horizontalWindSpeed["mn"].(float64)
+		sol.Hws.Mx = horizontalWindSpeed["mx"].(float64)
 
 		atmosphericPressure := solData.(map[string]interface{})["PRE"].(map[string]interface{})
-		sol.Data.Pre.Av = atmosphericPressure["av"].(float64)
-		sol.Data.Pre.Ct = atmosphericPressure["ct"].(float64)
-		sol.Data.Pre.Mn = atmosphericPressure["mn"].(float64)
-		sol.Data.Pre.Mx = atmosphericPressure["mx"].(float64)
+		sol.Pre.Av = atmosphericPressure["av"].(float64)
+		sol.Pre.Ct = atmosphericPressure["ct"].(float64)
+		sol.Pre.Mn = atmosphericPressure["mn"].(float64)
+		sol.Pre.Mx = atmosphericPressure["mx"].(float64)
 
 		newSols = append(newSols, sol)
 	}
-	fmt.Printf("%v", newSols)
-	nd.saveToCache(newSols)
 
-	// Save to mongoDB
-	// nd.saveToMongo()
+	nd.saveToCache(newSols)
+	nd.saveToMongo(newSols)
+
 }
 
-func (nd *NasaData) saveToMongo() {
-	// Save data to mongo
-	/*
-		for solId, data := range nd.Sols {
-			//save (solId, data )
-			// Data to JSON and SAVE the data to mongoDB
-			nd.mongoDBClient.Set(data.SolId, "smth 	"+data.SolId)
-			log.Println(nd.mongoDBClient.Get(data.SolId))
+func (nd *NasaData) saveToMongo(newSols []types.Sol) {
+	solsCollections := nd.client.Database("weather-on-mars").Collection("sols")
 
+	for _, solData := range newSols {
+		_, err := solsCollections.UpdateOne(context.TODO(), bson.M{"solID": bson.M{"$eq": solData.SolId}}, bson.M{"$set": solData}, options.Update().SetUpsert(true))
+		if err != nil {
+			fmt.Printf("error %s\n", err)
+			return
 		}
-	*/
+	}
 }
 
 func (nd *NasaData) saveToCache(newSols []types.Sol) {
@@ -114,25 +113,22 @@ func (nd *NasaData) saveToCache(newSols []types.Sol) {
 	}
 }
 
-// You simply want to fetch the data. We dont care whether it exists
-// on disk or memory.
-func (nd *NasaData) get(solId string) {
-	// If solId in current sols (last 7) -> get from redis
-	// If it does not exisst in redis -> get from DB
-	// If sol is older than 7 sols (is not returned by NASA) -> fetch from DB
-}
-
 func main() {
+	dbHost := "localhost"
+	dbPort := "48000"
+
+	client := database.NewMongoDB(dbHost, dbPort)
+
 	// We re going to start our periodic data updater here.
 	cache := cache.Cache{SolCache: make(map[string]types.Sol)}
-	nasaData := NasaData{&cache}
+	nasaData := NasaData{&cache, client}
+
 	go nasaData.runUpdater()
 
 	http.Handle("/graphql", &relay.Handler{
-		Schema: parseSchema("./schema.graphql", resolvers.NewRootResolver(&cache)),
+		Schema: parseSchema("./schema.graphql", resolvers.NewRootResolver(&cache, client)),
 	})
 
 	fmt.Println("serving on 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-
 }
